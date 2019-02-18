@@ -1,28 +1,41 @@
-var {Artboard, BooleanGroup, Color, Ellipse, GraphicNode, Group, Line, LinkedGraphic, Path, Rectangle, RepeatGrid, RootNode, SceneNode, SymbolInstance, Text} = require("scenegraph");
+const {Artboard, BooleanGroup, Color, Ellipse, GraphicNode, Group, Line, LinkedGraphic, Path, Rectangle, RepeatGrid, RootNode, SceneNode, SymbolInstance, Text} = require("scenegraph");
 
-const APP = require("application");
-const LS = require("uxp").storage;
-const LFS = require("uxp").storage.localFileSystem;
+const application = require("application");
+const localFileSystem = require("uxp").storage.localFileSystem;
 const commands = require("commands");
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - REFERENCES
+// - - - - - - - - - - - - - - - - - - - - APPLICATION
+let xdVersion = application.version;
+let xdRequiredMajorVersion = 14;
+
+// - - - - - - - - - - - - - - - - - - - - UI
 var pluginFolder;
 var dataFolder;
 var settingsFile;
 var settingsA = [];
 var jsonSettings;
 
-var pluginTitle = "App Icon Generator";
-
-var separatorColor = "#E4E4E4";
-
 var dialogWidth = 620;
 
-var exportFolder;
-var appFolder;
-var existingAppFolder;
+var pluginTitle = "App Icon Generator";
 
-var appName;
+var labelFontSizeMini = 10;
+var labelFontSize = 11;
+var textFontSize = 12;
+
+var activeColor = "#2680EB";
+var inactiveColor = "#A0A0A0";
+var activeBkgColor = "#E2E2E2";
+var lightBkgColor = "#FBFBFB";
+var labelQuietColor = "#999";
+var separatorColor = "#E4E4E4";
+var errorColor = "#FF0000";
+
+var exportFolder;
+var projectFolder;
+var existingProjectFolder;
+var projectName;
 
 var renditionsA;
 
@@ -67,7 +80,7 @@ mainHeader.appendChild(mainTitle);
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - USAGE BUTTON
 var usageB = createButton("", "primary", true);
 // usageB.style.marginLeft = 80;
-usageB.onclick = (e) => openUsage("Usage", "App Icon Generator exports all app icon renditions according to iOS, Android, UWP and XD requirements.\n\n• select a square Artboard, object or group;\n• make sure the selected element is 100x100 px;\n• Plugins > App Icon Generator;\n• choose an Export Folder for saving assets;\n• insert an App Name;\n• insert a File Name (expand the Platform lists to see a preview of file names);\n• select at least one Platform.");
+usageB.onclick = (e) => openUsage("Usage", "App Icon Generator exports all app icon renditions according to iOS, Android, UWP and XD requirements.\n\n• select a square Artboard, object or group;\n• Plugins > App Icon Generator;\n• choose an Export Folder for saving assets;\n• insert a Project Name;\n• insert a File Name (expand the Platform lists to see a preview of file names);\n• select at least one Platform.");
 mainHeader.appendChild(usageB);
 
 var usageIcon = document.createElement("img");
@@ -113,12 +126,12 @@ exportFolderB.appendChild(browseIcon);
 exportFolderB.onclick = (e) => selectExportFolder();
 exportFolderRow.appendChild(exportFolderB);
 
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - APP NAME
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - PROJECT NAME
 var appNameGroup = document.createElement("div");
 appNameGroup.style.marginBottom = 20;
 container.appendChild(appNameGroup);
 
-var appNameL = createLabel("App Name");
+var appNameL = createLabel("Project Name");
 appNameL.style.marginLeft = 6;
 appNameGroup.appendChild(appNameL);
 var appNameTF = createTextInput("", "", false);
@@ -142,46 +155,27 @@ fileNameTF.value = "icon_";
 fileNameTF.oninput = (e) => changeFileNames(fileNameTF.value);
 fileNameGroup.appendChild(fileNameTF);
 
-
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - SCROLL VIEW
 var renditionsSV = document.createElement("div");
-// renditionsSV.style.margin = scrollViewSeparator.style.margin;
 renditionsSV.style.position = "absolute";
 renditionsSV.style.top = 0;
 renditionsSV.style.left = 380;
 renditionsSV.style.padding = "30 10 30 20";
-// renditionsSV.style.width = 380;
 renditionsSV.style.width = 240;
 renditionsSV.style.height = 440;
-// renditionsSV.style.height = 424;
 renditionsSV.style.background = "#FFF";
 renditionsSV.style.overflowY = "auto";
 renditionsSV.style.overflowX = "hidden";
-// dataSV.style.overflow = "hidden";
 container.appendChild(renditionsSV);
-
-/*
-var footerBkg = document.createElement("div");
-footerBkg.style.position = "absolute";
-footerBkg.style.bottom = 0;
-footerBkg.style.right = 0;
-footerBkg.style.width = renditionsSV.style.width;
-footerBkg.style.height = 100;
-footerBkg.style.background = "#F7F7F7";
-// footerBkg.style.background = "#CCCCCC";
-footerBkg.style.opacity = .9;
-container.appendChild(footerBkg);
-*/
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - WARNING
 var warningMessage = document.createElement("div");
 warningMessage.style.marginLeft = 6;
 warningMessage.style.width = 300;
-// warningMessage.style.background = "#CCC";
-warningMessage.style.color = "#FF0000";
+warningMessage.style.color = errorColor;
 warningMessage.style.textAlign = "center";
 warningMessage.style.visibility = "hidden";
-warningMessage.style.fontSize = 12;
+warningMessage.style.fontSize = labelFontSize;
 warningMessage.textContent = "Warning Message";
 container.appendChild(warningMessage);
 
@@ -192,7 +186,6 @@ footer.style.width = 310;
 container.appendChild(footer);
 
 var cancelB = createButton("Cancel");
-// cancelB.onclick = (e) => dialog.close();
 cancelB.onclick = (e) => cancelDialog();
 footer.appendChild(cancelB);
 
@@ -204,6 +197,19 @@ footer.appendChild(okB);
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - MAIN FUNCTION
 async function init(selection)
 {
+	try
+	{
+		let v = await checkXdVersion();
+		if(!v)
+		{
+			return;
+		}
+	}
+	catch(_error)
+	{
+		console.log(_error);
+	}
+
 	mainSelection = selection;
 	
 	try
@@ -211,7 +217,6 @@ async function init(selection)
 		let s = await checkSelection(selection);
 		if(s)
 		{
-			
 			// get db
 			try
 			{
@@ -302,7 +307,7 @@ async function init(selection)
 					// console.log("ESC pressed");
 					if(replaceConfirmBox != null)
 					{
-						replaceConfirmBox.remove();
+						closeReplaceConfirm();
 					}
 					if(usageBox != null)
 					{
@@ -338,6 +343,35 @@ async function init(selection)
 	}
 }
 
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - XD VERSION CHECK
+async function checkXdVersion()
+{
+	// console.log("checkXdVersion()");
+	
+	/* console.log("XD version: " + xdVersion);
+	console.log("XD required version: " + xdRequiredMajorVersion); */
+
+	let xdVersionItemsA = xdVersion.split(".");
+	// console.log(xdVersionItemsA);
+	let xdMajorVersion = parseInt(xdVersionItemsA[0]);
+	// console.log(xdVersion);
+	if(xdMajorVersion < xdRequiredMajorVersion)
+	{
+		try
+		{
+			await openAlertDialog(pluginTitle, pluginTitle + " requires XD " + xdRequiredMajorVersion + ". Please update XD.");
+			// return;
+		}
+		catch(_error)
+		{
+			console.log(_error);
+		}
+		return false;
+	}
+
+	return true;
+}
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - SELECTION CHECK
 async function checkSelection(_selection)
 {
@@ -345,8 +379,7 @@ async function checkSelection(_selection)
 	{
 		try
 		{
-			// let a = await openAlertDialog(pluginTitle, "Please select a square Artboard, object or group.");
-			await openAlertDialog(pluginTitle, "Please select a square Artboard, object or group. Make sure the selected element is 100x100 px.");
+			await openAlertDialog(pluginTitle, "Please select a square Artboard, object or group.");
 		}
 		catch(_error)
 		{
@@ -366,14 +399,12 @@ async function checkSelection(_selection)
 	selectedObjectBounds = selectedObject.boundsInParent;
 	selectedObjectWidth = selectedObjectBounds.width;
 	selectedObjectHeight = selectedObjectBounds.height;
-		
-	// if(Math.round(selectedObjectWidth) != Math.round(selectedObjectHeight)) // (selectedObjectWidth != 100 || selectedObjectHeight != 100) 
-	if(selectedObjectWidth != 100 || selectedObjectHeight != 100) 
+
+	if(selectedObjectWidth != selectedObjectHeight)
 	{
 		try
 		{
-			// let a = await openAlertDialog(pluginTitle, "The selected object is not a perfect square.");
-			await openAlertDialog(pluginTitle, "Make sure the selected element is 100x100 px.");
+			await openAlertDialog(pluginTitle, "The selected object is not a perfect square.");
 			
 			if(multipleSelection == true)
 			{
@@ -387,6 +418,7 @@ async function checkSelection(_selection)
 			console.log(_error);
 		}
 	}
+	
 	return true;
 }
 
@@ -418,7 +450,7 @@ async function openAlertDialog(_title, _message)
 	// MESSAGE
 	let alertMessage = document.createElement("div");
 	alertMessage.style.padding = "0 6";
-	alertMessage.style.fontSize = 12;
+	alertMessage.style.fontSize = textFontSize;
 	alertMessage.textContent = _message;
 	alertContainer.appendChild(alertMessage);
 	
@@ -466,26 +498,31 @@ async function validateDialog(_e)
 	{
 		return;
 	}
-	
-	/*
-	if(!checkExistingAppFolder())
-	{
-		return;
-	}
-	*/
-	
-	
+
 	try
 	{
-		let folderExists = await checkExistingAppFolder();
-		if(folderExists == true)
+		let exportFolderExists = await checkExistingExportFolder();
+		if(exportFolderExists == true)
 		{
 			return;
 		}
 	}
 	catch(_error)
 	{
-		
+		console.log(_error);
+	}
+
+	try
+	{
+		let projectFolderExists = await checkExistingProjectFolder();
+		if(projectFolderExists == true)
+		{
+			return;
+		}
+	}
+	catch(_error)
+	{
+		console.log(_error);
 	}
 	
 	dialog.close("OK");
@@ -563,11 +600,7 @@ async function openReplaceConfirm(_title, _message)
 	alertTitle.textContent = _title;
 	alert.appendChild(alertTitle);
 	
-	let alertMessage = document.createElement("label");
-	alertMessage.style.fontSize = 12;
-	// alertMessage.style.background = "#EAEAEA";
-	// alertMessage.style.color = "#2C2C2C";
-	alertMessage.textContent = _message;
+	let alertMessage = createLabel(_message);
 	alert.appendChild(alertMessage);
 	
 	let alertFooter = document.createElement("div");
@@ -577,15 +610,19 @@ async function openReplaceConfirm(_title, _message)
 	alertFooter.style.marginTop = 20;
 	alert.appendChild(alertFooter);
 	
-	let cancelB = createButton("Cancel");
-	// cancelB.onclick = (e) => dialog.close();
-	// cancelB.onclick = (e) => closeReplaceConfirm();
-	cancelB.onclick = (e) => replaceConfirmBox.remove();
-	alertFooter.appendChild(cancelB);
+	let cancelReplaceB = createButton("Cancel");
+	// cancelReplaceB.onclick = (e) => dialog.close();
+	cancelReplaceB.onclick = (e) => closeReplaceConfirm();
+	alertFooter.appendChild(cancelReplaceB);
 	
 	let closeB = createButton("Replace", "warning", false);
 	closeB.onclick = (e) => replaceExistingAssets();
 	alertFooter.appendChild(closeB);
+}
+
+function closeReplaceConfirm()
+{
+	replaceConfirmBox.remove();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - USAGE
@@ -599,12 +636,12 @@ function openUsage(_title, _message)
 	usageBox.style.height = 1000;
 	container.appendChild(usageBox);
 	
-	let helpBkg = document.createElement("div");
-	helpBkg.style.width = usageBox.style.width;
-	helpBkg.style.height = usageBox.style.height;
-	helpBkg.style.background = "#000";
-	helpBkg.style.opacity = .8;
-	usageBox.appendChild(helpBkg);
+	let usageBkg = document.createElement("div");
+	usageBkg.style.width = usageBox.style.width;
+	usageBkg.style.height = usageBox.style.height;
+	usageBkg.style.background = "#000";
+	usageBkg.style.opacity = .8;
+	usageBox.appendChild(usageBkg);
 	
 	let alert = document.createElement("div");
 	alert.style.position = "absolute";
@@ -615,17 +652,14 @@ function openUsage(_title, _message)
 	alert.style.background = "#FFF";
 	usageBox.appendChild(alert);
 	
-	let alertTitle = document.createElement("label");
+	let alertTitle = createLabel(_title);
 	alertTitle.style.marginBottom = 20;
 	alertTitle.style.fontSize = 14;
 	alertTitle.style.fontWeight = "bold";
 	alertTitle.style.color = "#2C2C2C";
-	alertTitle.textContent = _title;
 	alert.appendChild(alertTitle);
 	
-	let alertMessage = document.createElement("label");
-	alertMessage.style.fontSize = 12;
-	alertMessage.textContent = _message;
+	let alertMessage = createLabel(_message);
 	alert.appendChild(alertMessage);
 	
 	let alertFooter = document.createElement("div");
@@ -636,8 +670,13 @@ function openUsage(_title, _message)
 	alert.appendChild(alertFooter);
 	
 	let closeB = createButton("OK", "primary", false);
-	closeB.onclick = (e) => usageBox.remove();
+	closeB.onclick = (e) => closeUsage();
 	alertFooter.appendChild(closeB);
+}
+
+function closeUsage()
+{
+	usageBox.remove();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - DATA CHECK
@@ -660,19 +699,18 @@ function checkExportFolder()
 function checkAppName()
 {
 	// console.log("checkAppName()");
-	appName = appNameTF.value;
-	// console.log(appName);
+	projectName = appNameTF.value;
+	// console.log(projectName);
 	
-	if(appName == "")
+	if(projectName == "")
 	{
-		displayWarning("Insert the App Name.");
+		displayWarning("Insert the Project Name.");
 		return false;
 	}
 	else
 	{
 		return true;
 	}
-	
 }
 
 function checkPlatform()
@@ -702,18 +740,35 @@ function checkPlatform()
 	}
 }
 
-async function checkExistingAppFolder()
+async function checkExistingExportFolder()
 {
-	// console.log("checkExistingAppFolder()");
-	
+	// console.log("checkExistingExportFolder()");
 	try
 	{
-		// let folder = await exportFolder.getEntry("./" + appName);
-		existingAppFolder = await exportFolder.getEntry("./" + appName);
-		if(existingAppFolder)
+		// try to get entries from export folder to check if it exists or has been deleted
+		await exportFolder.getEntries();
+	}
+	catch(_error)
+	{
+		// console.log("CATCH ERROR! - EXPORT FOLDER HAS BEEN DELETED");
+		// keep commented - when export folder doesn't exist it displays { [Error: no such file or directory] code: -2 }
+		// console.log(_error);
+		
+		displayWarning("The selected Export Folder doesn't exist.");
+		return true;
+	}
+}
+
+async function checkExistingProjectFolder()
+{
+	// console.log("checkExistingProjectFolder()");
+	try
+	{
+		// console.log("getEntry()");
+		existingProjectFolder = await exportFolder.getEntry("./" + projectName);
+		if(existingProjectFolder)
 		{
-			// displayWarning("App name already used. Overwrite?");
-			let a = await openReplaceConfirm("Replace existing folder?", "\"" + appName + "\" folder already exists. Replacing it will overwrite its current contents.");
+			await openReplaceConfirm("Replace existing folder?", "\"" + projectName + "\" folder already exists. Replacing it will overwrite its current contents.");
 			return true;
 		}
 		else
@@ -723,7 +778,8 @@ async function checkExistingAppFolder()
 	}
 	catch(_error)
 	{
-		console.log(_error);
+		// keep commented - when project folder doesn't exist it displays [Error: getEntry: File with given name not found]
+		// console.log(_error);
 	}
 }
 
@@ -748,37 +804,32 @@ function createTextInput(_placeholder, _width, _quiet)
 
 function createCheckBox(_placeholder, _width, _checked)
 {
-    let newCheckBoxGroup = document.createElement("label");
-	newCheckBoxGroup.style.display = "flex";
-	newCheckBoxGroup.style.flexDirection = "row";
-	newCheckBoxGroup.style.alignItems = "center";
+    let newCheckBox = document.createElement("label");
+	newCheckBox.style.display = "flex";
+	newCheckBox.style.flexDirection = "row";
+	newCheckBox.style.alignItems = "center";
 	
-	let newCheckBox = document.createElement("input");
-    newCheckBox.type = "checkbox";
-    /*newCheckBox.id = _placeholder;
-    newCheckBox.placeholder = _placeholder;*/
+	let checkBox = document.createElement("input");
+    checkBox.type = "checkbox";
 	if (_checked)
 	{
-        newCheckBox.checked = true;
+        checkBox.checked = true;
     }
-	newCheckBoxGroup.appendChild(newCheckBox);
+	newCheckBox.appendChild(checkBox);
 	
-	let newCheckBoxLabel = document.createElement("span");
-	newCheckBoxLabel.style.marginLeft = 2;
-	newCheckBoxLabel.style.width = _width;
-    newCheckBoxLabel.textContent = _placeholder;
-    newCheckBoxGroup.appendChild(newCheckBoxLabel);
+	let checkBoxL = createLabel(_placeholder);
+	checkBoxL.style.marginLeft = 2;
+	checkBoxL.style.width = _width;
+    newCheckBox.appendChild(checkBoxL);
 	
-    return newCheckBoxGroup;
+    return newCheckBox;
 }
 
 function createLabel(_text)
 {
 	let newLabel = document.createElement("span");
-	// label.style.margin = 5;
-	// label.style.minWidth = 150;
 	newLabel.style.textAlign = "left";
-	newLabel.style.fontSize = 12;
+	newLabel.style.fontSize = labelFontSize;
 	newLabel.textContent = _text;
 	return newLabel;
 }
@@ -790,7 +841,7 @@ async function getDB()
 	try
 	{
 		// console.log("\tget plugin folder");
-		pluginFolder = await LFS.getPluginFolder();
+		pluginFolder = await localFileSystem.getPluginFolder();
 		try
 		{
 			// console.log("\tget renditions file");
@@ -824,7 +875,7 @@ async function setDefaultSettings()
 	try
 	{
 		// console.log("\tget data folder");
-		dataFolder = await LFS.getDataFolder();
+		dataFolder = await localFileSystem.getDataFolder();
 		
 		try
 		{
@@ -1010,7 +1061,7 @@ async function selectExportFolder()
 {
 	try
 	{
-		exportFolder = await LFS.getFolder();
+		exportFolder = await localFileSystem.getFolder();
 		if (exportFolder)
 		{
 			// exportFolderTF.value = exportFolder.nativePath;
@@ -1057,10 +1108,10 @@ async function exportAppIconOK()
 	
 	try
 	{
-		appFolder = await exportFolder.createFolder(appName, {overwrite: true});
-		// appFolder = await exportFolder.createEntry(appName, {type: LS.types.folder, overwrite: true})
-		// appFolder = await exportFolder.createEntry(appName, {type: LS.types.folder})
-		if(appFolder)
+		// create project folder
+		// console.log("create project folder: " + projectName);
+		projectFolder = await exportFolder.createFolder(projectName, {overwrite: true});
+		if(projectFolder)
 		{
 			for(let i = 0; i < renditionsA.length; i ++)
 			{
@@ -1068,10 +1119,9 @@ async function exportAppIconOK()
 				{
 					try
 					{
-						// create iOS folder
-						let platformFolder = await appFolder.createFolder(renditionsA[i]["platform"], {overwrite: true});
-						// let platformFolder = await appFolder.createEntry(renditionsA[i]["platform"], {type: LS.types.folder, overwrite: true});
-						// iosFolder = await appFolder.createEntry("iOS", {type: LS.types.folder});
+						// create platform folder
+						// console.log("\tcreate platform folder: " + renditionsA[i]["platform"]);
+						let platformFolder = await projectFolder.createFolder(renditionsA[i]["platform"], {overwrite: true});
 						if (platformFolder)
 						{
 							// exportRenditions(renditionsA[i]["renditions"], platformFolder);
@@ -1104,7 +1154,7 @@ async function exportAppIconOK()
 
 async function exportRenditions(_renditionsA, _platformFolder)
 {	
-	// console.log("exportRenditions()");
+	// console.log("\texportRenditions()");
 		
 	let renditions = [];
 		
@@ -1116,8 +1166,6 @@ async function exportRenditions(_renditionsA, _platformFolder)
 		try
 		{
 			let file = await _platformFolder.createFile(fileName, {overwrite: true});
-			// let file = await _platformFolder.createEntry(fileName, {type: LS.types.file, overwrite: true});
-			// let file = await _platformFolder.createEntry(fileName, {type: LS.types.file});
 			
 			if(file)
 			{
@@ -1126,7 +1174,7 @@ async function exportRenditions(_renditionsA, _platformFolder)
 				
 				// console.log("target size: " + _sizesA[i] + "\nartwork size: " + selectedObjectWidth + "\nscale factor: " + scaleFactor + "\n\n");
 				
-				let rendition = {node: selectedObject, outputFile: file, type: APP.RenditionType.PNG, scale: scaleFactor};
+				let rendition = {node: selectedObject, outputFile: file, type: application.RenditionType.PNG, scale: scaleFactor};
 				renditions.push(rendition);
 			}
 		}
@@ -1138,7 +1186,7 @@ async function exportRenditions(_renditionsA, _platformFolder)
 	
 	try
 	{
-		await APP.createRenditions(renditions);
+		await application.createRenditions(renditions);
 	}
 	catch(_error)
 	{
@@ -1148,9 +1196,10 @@ async function exportRenditions(_renditionsA, _platformFolder)
 
 async function replaceExistingAssets()
 {
+	// console.log("replaceExistingAssets()");
 	try
 	{
-		let entries = await existingAppFolder.getEntries();
+		let entries = await existingProjectFolder.getEntries();
 		// entries.map(entry => console.log(entry.name));
 		if(entries.length > 0)
 		{
@@ -1188,7 +1237,7 @@ async function replaceExistingAssets()
 					try
 					{
 						// delete each platform folder
-						// console.log("remove: " + entries[i].name);
+						// console.log("remove folder: " + entries[i].name);
 						await entries[i].delete();
 					}
 					catch(_error)
@@ -1202,10 +1251,10 @@ async function replaceExistingAssets()
 		// delete any other kind of entry, including invisibles
 		entries.map(entry => entry.delete());
 		
-		// delete app folder (now empty)
+		// delete project folder (now empty)
 		try
 		{
-			await existingAppFolder.delete();
+			await existingProjectFolder.delete();
 		}
 		catch(_error)
 		{
@@ -1213,18 +1262,9 @@ async function replaceExistingAssets()
 		}
 
 		// close confirm
-		// closeReplaceConfirm();
-		replaceConfirmBox.remove();
-
-		// re-export renditions from scratch
-		try
-		{
-			await exportAppIconOK();
-		}
-		catch(_error)
-		{
-			console.log(_error);
-		}
+		closeReplaceConfirm();
+		// replaceConfirmBox.remove();
+		
 		// close main dialog
 		dialog.close("OK");
 	}
