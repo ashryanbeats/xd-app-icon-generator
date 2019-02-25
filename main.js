@@ -4,6 +4,9 @@ const application = require("application");
 const localFileSystem = require("uxp").storage.localFileSystem;
 const commands = require("commands");
 
+const replaceFolder = require("./replaceFolder");
+const usage = require("./usage");
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - REFERENCES
 // - - - - - - - - - - - - - - - - - - - - APPLICATION
 let xdVersion = application.version;
@@ -46,8 +49,9 @@ var selectedObjectWidth;
 var selectedObjectHeight;
 var multipleSelection;
 
-var replaceConfirmBox;
-var usageBox;
+var popup;
+var popupSV;
+var popupOpen = false;
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - MAIN DIALOG
 var dialog = document.createElement("dialog");
@@ -80,7 +84,8 @@ mainHeader.appendChild(mainTitle);
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - USAGE BUTTON
 var usageB = createButton("", "primary", true);
 // usageB.style.marginLeft = 80;
-usageB.onclick = (e) => openUsage("Usage", "App Icon Generator exports all app icon renditions according to iOS, Android, UWP and XD requirements.\n\n• select a square Artboard, object or group;\n• Plugins > App Icon Generator;\n• choose an Export Folder for saving assets;\n• insert a Project Name;\n• insert a File Name (expand the Platform lists to see a preview of file names);\n• select at least one Platform.");
+usageB.onclick = (e) => openPopup("usage", "Usage", false);
+usageB.style.title = "How to use " + pluginTitle;
 mainHeader.appendChild(usageB);
 
 var usageIcon = document.createElement("img");
@@ -110,21 +115,23 @@ exportFolderRow.style.flexDirection = "row";
 exportFolderRow.style.alignItems = "center";
 exportFolderGroup.appendChild(exportFolderRow);
 
-// var exportFolderTF = createTextInput("Select Export Folder", null, false);
 var exportFolderTF = createTextInput("", null, false);
 exportFolderTF.style.width = 260;
 exportFolderTF.setAttribute("readonly", true);
 exportFolderTF.style.background = "#FBFBFB";
 exportFolderRow.appendChild(exportFolderTF);
 
-var exportFolderB = createButton("", "action", true);
+// var exportFolderB = createButton("", "action", true);
+var exportFolderB = createButton("", "primary", true);
 exportFolderB.style.paddingLeft = 2;
 exportFolderB.style.paddingRight = 2;
+exportFolderB.onclick = (e) => selectExportFolder();
+exportFolderB.style.title = "Choose an export folder";
+exportFolderRow.appendChild(exportFolderB);
+
 var browseIcon = document.createElement("img");
 browseIcon.src = "img/browse.png";
 exportFolderB.appendChild(browseIcon);
-exportFolderB.onclick = (e) => selectExportFolder();
-exportFolderRow.appendChild(exportFolderB);
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - PROJECT NAME
 var appNameGroup = document.createElement("div");
@@ -305,13 +312,12 @@ async function init(selection)
 				if(d)
 				{
 					// console.log("ESC pressed");
-					if(replaceConfirmBox != null)
+
+					if(popupOpen)
 					{
-						closeReplaceConfirm();
-					}
-					if(usageBox != null)
-					{
-						usageBox.remove();
+						closePopup("");
+						// cancelPopup();
+						// popup.remove();
 					}
 					
 					// save settings
@@ -550,133 +556,117 @@ function displayWarning(_message)
 	warningMessage.style.visibility = "visible";
 }
 
-async function openReplaceConfirm(_title, _message)
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - POPUP
+function openPopup(_popupType, _title, _allowCancel)
 {
-	replaceConfirmBox = document.createElement("div");
-	// replaceConfirmBox.style.display = "flex";
-	replaceConfirmBox.style.position = "absolute";
-	replaceConfirmBox.style.top = 0;
-	replaceConfirmBox.style.left = 0;
-	// replaceConfirmBox.style.width = 402;
-	// replaceConfirmBox.style.width = 380;
-	replaceConfirmBox.style.width = dialogWidth;
-	replaceConfirmBox.style.height = 1000;
-	container.appendChild(replaceConfirmBox);
+	// console.log("openPopup()");
+
+	popup = document.createElement("div");
+	popup.style.position = "absolute";
+	popup.style.top = 0;
+	popup.style.left = 0;
+	popup.style.width = dialogWidth;
+	popup.style.height = 1000;
+	container.appendChild(popup);
 	
-	let alertBkg = document.createElement("div");
-	// alertBkg.style.display = "flex";
-	// alertBkg.style.position = "absolute";
-	// alertBkg.style.top = 0;
-	// alertBkg.style.left = 0;
-	alertBkg.style.width = replaceConfirmBox.style.width;
-	alertBkg.style.height = replaceConfirmBox.style.height;
-	alertBkg.style.background = "#000";
-	alertBkg.style.opacity = .8;
-	// alertBkg.onclick = (e) => closeAlert();
-	replaceConfirmBox.appendChild(alertBkg);
+	let popupBkg = document.createElement("div");
+	popupBkg.style.width = popup.style.width;
+	popupBkg.style.height = popup.style.height;
+	popupBkg.style.background = "#000000";
+	popupBkg.style.opacity = .8;
+	// popupBkg.onclick = (e) => popup.remove();
+	popup.appendChild(popupBkg);
+
+	let popupContainer = document.createElement("div");
+	popupContainer.style.position = "absolute";
+	popupContainer.style.padding = "20 0 20 20";
+	popupContainer.style.width = 260;
+	popupContainer.style.left = (popup.style.width.value / 2) - (popupContainer.style.width.value / 2);
+	// popupContainer.style.borderRadius = 4; // "0 0 4 4";
+	popupContainer.style.background = "#FFFFFF";
+	popup.appendChild(popupContainer);
+
+	let popupTitleL = createLabel(_title);
+	popupTitleL.style.marginBottom = 20;
+	popupTitleL.style.fontSize = 14;
+	popupTitleL.style.fontWeight = "bold";
+	popupTitleL.style.color = "#2C2C2C";
+	popupContainer.appendChild(popupTitleL);
+
+	let separatorTop = document.createElement("div");
+	separatorTop.style.width = 220;
+	separatorTop.style.height = 1;
+	separatorTop.style.background = separatorColor;
+	popupContainer.appendChild(separatorTop);
 	
-	let alert = document.createElement("div");
-	// alert.style.display = "flex";
-	alert.style.position = "absolute";
-	alert.style.padding = 20;
-	alert.style.width = 260;
-	// alert.style.height = 260;
-	// alert.style.top = 100;
-	alert.style.left = (replaceConfirmBox.style.width.value / 2) - (alert.style.width.value / 2);
-	// alert.style.top = alert.style.left;
-	// alert.style.borderRadius = 4;
-	alert.style.borderRadius = "0 0 4 4";
-	// console.log(replaceConfirmBox.style.width.value);
-	// console.log(dialog.style.width);
-	// console.log(dialog.style.height);
-	alert.style.background = "#FFF";
-	replaceConfirmBox.appendChild(alert);
+	popupSV = document.createElement("div");
+	popupSV.style.padding = "20 0 20 0";
+	popupSV.style.maxHeight = 150;
+	popupSV.style.overflowX = "hidden";
+	popupSV.style.overflowY = "auto";
+	popupContainer.appendChild(popupSV);
+
+	switch(_popupType)
+	{
+		case "replaceFolder":
+			let rf = replaceFolder(popupSV, projectName);
+			break;
+			
+		case "usage":
+			let u = usage(popupSV);
+			break;
+	}
+
+	let separatorBottom = document.createElement("div");
+	separatorBottom.style.margin = "0 0 20 0";
+	separatorBottom.style.width = 220;
+	separatorBottom.style.height = 1;
+	separatorBottom.style.background = separatorColor;
+	popupContainer.appendChild(separatorBottom);
 	
-	let alertTitle = document.createElement("label");
-	alertTitle.style.marginBottom = 20;
-	alertTitle.style.fontSize = 14;
-	alertTitle.style.fontWeight = "bold";
-	alertTitle.style.color = "#2C2C2C";
-	alertTitle.textContent = _title;
-	alert.appendChild(alertTitle);
+	let popupFooter = document.createElement("div");
+	popupFooter.style.display = "flex"; 
+	popupFooter.style.flexDirection = "row";
+	popupFooter.style.justifyContent = "flex-end";
+	popupFooter.style.marginTop = 20;
+	popupContainer.appendChild(popupFooter);
 	
-	let alertMessage = createLabel(_message);
-	alert.appendChild(alertMessage);
-	
-	let alertFooter = document.createElement("div");
-	alertFooter.style.display = "flex"; 
-	alertFooter.style.flexDirection = "row";
-	alertFooter.style.justifyContent = "flex-end";
-	alertFooter.style.marginTop = 20;
-	alert.appendChild(alertFooter);
-	
-	let cancelReplaceB = createButton("Cancel");
-	// cancelReplaceB.onclick = (e) => dialog.close();
-	cancelReplaceB.onclick = (e) => closeReplaceConfirm();
-	alertFooter.appendChild(cancelReplaceB);
-	
-	let closeB = createButton("Replace", "warning", false);
-	closeB.onclick = (e) => replaceExistingAssets();
-	alertFooter.appendChild(closeB);
+	if(_allowCancel)
+	{
+		let popupCancelB = createButton("Cancel");
+		popupCancelB.onclick = (e) => closePopup("");
+		popupFooter.appendChild(popupCancelB);
+	}
+
+	if(_popupType == "replaceFolder")
+	{
+		let replaceFolderB = createButton("Replace", "warning", false);
+		replaceFolderB.style.marginRight = 14;
+		replaceFolderB.onclick = (e) => replaceExistingAssets();
+		popupFooter.appendChild(replaceFolderB);
+	}
+	else
+	{
+		let popupOkB = createButton("OK", "primary", false);
+		popupOkB.style.marginRight = 14;
+		popupOkB.onclick = (e) => closePopup(_popupType);
+		popupFooter.appendChild(popupOkB);
+	}
+
+	popupOpen = true;
 }
 
-function closeReplaceConfirm()
+function closePopup(_popupType)
 {
-	replaceConfirmBox.remove();
-}
-
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - USAGE
-function openUsage(_title, _message)
-{
-	usageBox = document.createElement("div");
-	usageBox.style.position = "absolute";
-	usageBox.style.top = 0;
-	usageBox.style.left = 0;
-	usageBox.style.width = dialogWidth;
-	usageBox.style.height = 1000;
-	container.appendChild(usageBox);
+	/* switch(_popupType)
+	{
+		case "_popupType":
+			// actions
+			break;
+	} */
 	
-	let usageBkg = document.createElement("div");
-	usageBkg.style.width = usageBox.style.width;
-	usageBkg.style.height = usageBox.style.height;
-	usageBkg.style.background = "#000";
-	usageBkg.style.opacity = .8;
-	usageBox.appendChild(usageBkg);
-	
-	let alert = document.createElement("div");
-	alert.style.position = "absolute";
-	alert.style.padding = 20;
-	alert.style.width = 320;
-	alert.style.left = (usageBox.style.width.value / 2) - (alert.style.width.value / 2);
-	alert.style.borderRadius = "0 0 4 4";
-	alert.style.background = "#FFF";
-	usageBox.appendChild(alert);
-	
-	let alertTitle = createLabel(_title);
-	alertTitle.style.marginBottom = 20;
-	alertTitle.style.fontSize = 14;
-	alertTitle.style.fontWeight = "bold";
-	alertTitle.style.color = "#2C2C2C";
-	alert.appendChild(alertTitle);
-	
-	let alertMessage = createLabel(_message);
-	alert.appendChild(alertMessage);
-	
-	let alertFooter = document.createElement("div");
-	alertFooter.style.display = "flex"; 
-	alertFooter.style.flexDirection = "row";
-	alertFooter.style.justifyContent = "flex-end";
-	alertFooter.style.marginTop = 20;
-	alert.appendChild(alertFooter);
-	
-	let closeB = createButton("OK", "primary", false);
-	closeB.onclick = (e) => closeUsage();
-	alertFooter.appendChild(closeB);
-}
-
-function closeUsage()
-{
-	usageBox.remove();
+	popup.remove();
+	popupOpen = false;
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - DATA CHECK
@@ -687,7 +677,7 @@ function checkExportFolder()
 	
 	if(exportFolderString == "")
 	{
-		displayWarning("Choose an Export Folder for exporting assets.");
+		displayWarning("Choose an export folder for exporting assets");
 		return false;
 	}
 	else
@@ -704,7 +694,7 @@ function checkAppName()
 	
 	if(projectName == "")
 	{
-		displayWarning("Insert the Project Name.");
+		displayWarning("Insert the project name");
 		return false;
 	}
 	else
@@ -723,7 +713,6 @@ function checkPlatform()
 		let platformCB = renditionsA[i]["checkBox"];
 		if(platformCB.checked == false)
 		{
-			// displayWarning("Select at least one platform");
 			platformUncheckedA.push(platformCB);
 			// return false;
 		}
@@ -731,7 +720,7 @@ function checkPlatform()
 	
 	if(platformUncheckedA.length == renditionsA.length)
 	{
-		displayWarning("Select at least one Platform.");
+		displayWarning("Select at least one platform");
 		return false;
 	}
 	else
@@ -754,7 +743,7 @@ async function checkExistingExportFolder()
 		// keep commented - when export folder doesn't exist it displays { [Error: no such file or directory] code: -2 }
 		// console.log(_error);
 		
-		displayWarning("The selected Export Folder doesn't exist.");
+		displayWarning("The selected export folder doesn't exist");
 		return true;
 	}
 }
@@ -768,7 +757,7 @@ async function checkExistingProjectFolder()
 		existingProjectFolder = await exportFolder.getEntry("./" + projectName);
 		if(existingProjectFolder)
 		{
-			await openReplaceConfirm("Replace existing folder?", "\"" + projectName + "\" folder already exists. Replacing it will overwrite its current contents.");
+			await openPopup("replaceFolder", "Replace existing folder?", true);
 			return true;
 		}
 		else
@@ -1197,6 +1186,7 @@ async function exportRenditions(_renditionsA, _platformFolder)
 async function replaceExistingAssets()
 {
 	// console.log("replaceExistingAssets()");
+
 	try
 	{
 		let entries = await existingProjectFolder.getEntries();
@@ -1261,9 +1251,7 @@ async function replaceExistingAssets()
 			console.log(_error);
 		}
 
-		// close confirm
-		closeReplaceConfirm();
-		// replaceConfirmBox.remove();
+		closePopup("");
 		
 		// close main dialog
 		dialog.close("OK");
