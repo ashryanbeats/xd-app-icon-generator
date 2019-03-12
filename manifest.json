@@ -1,44 +1,44 @@
 {
-    "name": "App Icon Generator",
-	"id": "1dbcf8c6",
-	"version": "1.0.9",
-    "author": "Paolo Biagini",
-    
-    "host":
-	{
-        "app": "XD",
-        "minVersion": "14.0.0"
+  "name": "App Icon Generator",
+  "id": "1dbcf8c6",
+  "version": "1.0.9",
+  "author": "Paolo Biagini",
+  "description": "App Icon Generator exports all app icon renditions according to iOS, Android, UWP and XD requirements.",
+  "summary": "Export app icons.",
+  "languages": ["en"],
+  "host": {
+    "app": "XD",
+    "minVersion": "14.0"
+  },
+
+  "icons": [
+    {
+      "width": 48,
+      "height": 48,
+      "path": "img/icon_48.png"
     },
-	
-	"icons":[
-      {
-         "width": 24,
-         "height": 24,
-         "path":"img/icon_24.png"
-      },
-	  {
-         "width": 48,
-         "height": 48,
-         "path":"img/icon_48.png"
-      },
-	  {
-         "width":96,
-         "height":96,
-         "path":"img/icon_96.png"
-      },
-	  {
-         "width": 512,
-         "height": 512,
-         "path":"img/icon_512.png"
-      }
-   ],
-		
-    "uiEntryPoints":
-	[
-        {
-            "type": "menu",
-            "label": "App Icon Generator...",
-            "commandId": "init"
-        }
-    ]
+    {
+      "width": 96,
+      "height": 96,
+      "path": "img/icon_96.png"
+    },
+    {
+      "width": 144,
+      "height": 144,
+      "path": "img/icon_144.png"
+    },
+    {
+      "width": 192,
+      "height": 192,
+      "path": "img/icon_192.png"
+    }
+  ],
+
+  "uiEntryPoints": [
+    {
+      "type": "menu",
+      "label": "App Icon Generator...",
+      "commandId": "init"
+    }
+  ]
 }
